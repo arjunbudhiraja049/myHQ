@@ -1,9 +1,6 @@
 """
-AI content pipeline powered by Google Gemini (free tier).
-
-Two-step process:
-  1. vet_articles()       — filters raw RSS articles to only relevant ones
-  2. generate_newsletter() — writes the full newsletter JSON
+AI content pipeline using Gemini REST API directly via requests.
+No google-generativeai package needed — avoids all version conflicts.
 """
 
 import json
@@ -11,21 +8,41 @@ import logging
 import os
 import re
 
-import google.generativeai as genai
+import requests
 
 from .config import REGIONS
 
 logger = logging.getLogger(__name__)
 
-_model = None
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-2.0-flash:generateContent"
+)
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-        _model = genai.GenerativeModel("gemini-1.5-flash")
-    return _model
+def _call_gemini(prompt: str) -> str:
+    """Send a prompt to Gemini and return the response text."""
+    api_key = os.environ["GEMINI_API_KEY"]
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096},
+    }
+    response = requests.post(
+        GEMINI_URL,
+        params={"key": api_key},
+        json=payload,
+        timeout=60,
+    )
+    response.raise_for_status()
+    return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def _clean_json(text: str) -> str:
+    """Strip markdown code fences if Gemini wraps output in them."""
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -34,15 +51,13 @@ def _get_model():
 
 def vet_articles(articles: list[dict], region_key: str) -> list[dict]:
     """
-    Send raw articles to Gemini and get back only those relevant
-    to office/commercial real estate in the given region.
-    Returns filtered list with a "category" key added to each article.
+    Send raw articles to Gemini — get back only the relevant ones
+    with a category tag on each.
     """
     if not articles:
         return []
 
     region_display = REGIONS[region_key]["display"]
-
     numbered = "\n".join(
         f"{i+1}. [{a['source']}] {a['title']} | {a['summary'][:200]}"
         for i, a in enumerate(articles)
@@ -67,15 +82,8 @@ Return ONLY a JSON array, no explanation, no markdown:
 Articles:
 {numbered}"""
 
-    model = _get_model()
     logger.info("Vetting %d articles for %s …", len(articles), region_key)
-
-    response = model.generate_content(prompt)
-    text = response.text.strip()
-
-    # Strip markdown code fences if present
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
+    text = _clean_json(_call_gemini(prompt))
 
     try:
         selections = json.loads(text)
@@ -105,14 +113,10 @@ def generate_newsletter(
     edition_number: int,
     date_range: str,
 ) -> dict:
-    """
-    Ask Gemini to write the full newsletter from vetted articles.
-    Returns a structured dict ready for HTML template rendering.
-    """
+    """Write the full newsletter from vetted articles. Returns structured dict."""
     region_display = REGIONS[region_key]["display"]
     areas = REGIONS[region_key]["areas"]
 
-    # Group articles by category
     grouped: dict[str, list[str]] = {}
     for a in vetted_articles:
         cat = a.get("category", "quick_bytes")
@@ -133,8 +137,7 @@ for real estate professionals in {region_display}.
 Edition #{edition_number} | {date_range}
 
 Audience: CRE brokers, corporate real estate heads, business POCs making leasing decisions.
-They are time-poor senior professionals. Tone: sharp, confident, market-intelligent.
-Not dry. Engaging enough they read it end to end.
+Tone: sharp, confident, market-intelligent. Not dry. Engaging enough they read it end to end.
 
 Source articles:
 {articles_text if articles_text else "Limited news this fortnight."}
@@ -146,12 +149,12 @@ Write the newsletter as a single valid JSON object. No markdown, no code fences,
 {{
   "region_display": "{region_display}",
   "edition": "Edition #{edition_number} | {date_range}",
-  "intro": "<2-3 sentence punchy intro — what is the big story this fortnight>",
-  "market_pulse": "<3-4 sentences on overall office market health — vacancy, absorption, rent trend>",
+  "intro": "<2-3 sentence punchy intro>",
+  "market_pulse": "<3-4 sentences on office market health — vacancy, absorption, rent trend>",
   "transactions": [
     {{
       "headline": "<deal headline>",
-      "body": "<2-3 sentences: company, sq ft, location, terms>",
+      "body": "<2-3 sentences>",
       "takeaway": "<1 sentence market signal>"
     }}
   ],
@@ -179,39 +182,27 @@ Write the newsletter as a single valid JSON object. No markdown, no code fences,
 Rules:
 - Only include sections with real content. Empty arrays [] are fine.
 - area_spotlights: pick top 3-4 most newsworthy areas from: {areas_list}
-- Ground every insight in the source articles — do not fabricate.
-- Return ONLY the JSON object."""
+- Ground every insight in the source articles. Do not fabricate.
+- Return ONLY the JSON object, nothing else."""
 
-    model = _get_model()
     logger.info("Generating newsletter for %s (edition #%d) …", region_key, edition_number)
-
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
-            temperature=0.7,
-            max_output_tokens=4096,
-        ),
-    )
-
-    raw = response.text.strip()
-    raw = re.sub(r"^```(?:json)?\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
+    text = _clean_json(_call_gemini(prompt))
 
     try:
-        newsletter = json.loads(raw)
+        newsletter = json.loads(text)
     except json.JSONDecodeError as exc:
-        logger.error("JSON parse failed: %s\nRaw:\n%s", exc, raw[:400])
+        logger.error("JSON parse failed: %s\nRaw:\n%s", exc, text[:400])
         newsletter = {
             "region_display": region_display,
             "edition": f"Edition #{edition_number} | {date_range}",
-            "intro": f"Your fortnightly market update for {region_display} is here.",
-            "market_pulse": "Market data is being compiled. Full update in next edition.",
+            "intro": f"Your fortnightly market update for {region_display}.",
+            "market_pulse": "Market data is being compiled.",
             "transactions": [],
             "developer_updates": [],
             "people_movement": [],
-            "quick_bytes": ["Newsletter content processing. Please check again shortly."],
+            "quick_bytes": ["Newsletter processing. Please check again shortly."],
             "area_spotlights": {},
-            "outro": "More insights coming in the next fortnight. Stay tuned.",
+            "outro": "More insights in the next edition.",
         }
 
     logger.info("Newsletter generated for %s", region_key)
