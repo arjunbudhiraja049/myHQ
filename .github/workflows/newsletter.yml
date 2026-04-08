@@ -1,0 +1,78 @@
+name: myHQ Fortnightly Newsletter
+
+on:
+  # Every other Monday at 8:00 AM IST (2:30 AM UTC)
+  # Week 1: Jan 6, Jan 20, Feb 3, Feb 17 … etc.
+  schedule:
+    - cron: "30 2 1,15 * *"   # 1st and 15th of every month at 8:00 AM IST
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "Region to process (leave blank for all)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no emails sent)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+jobs:
+  send-newsletter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restore subscriber database from cache between runs
+      - name: Restore subscriber database
+        uses: actions/cache@v4
+        with:
+          path: data/subscribers.db
+          key: subscribers-db-${{ github.run_id }}
+          restore-keys: |
+            subscribers-db-
+
+      - name: Run newsletter pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          FROM_NAME: ${{ secrets.FROM_NAME }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ -n "${{ github.event.inputs.region }}" ]; then
+            python main.py --region "${{ github.event.inputs.region }}"
+          else
+            python main.py
+          fi
+
+      - name: Upload newsletter log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-log-${{ github.run_id }}
+          path: newsletter.log
+          retention-days: 30
