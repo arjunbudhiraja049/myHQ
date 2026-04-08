@@ -1,44 +1,31 @@
 """
-AI content pipeline powered by Claude (claude-opus-4-6).
+AI content pipeline powered by Google Gemini (free tier).
 
 Two-step process:
-  1. vet_articles()      — filters raw RSS articles to only relevant ones
+  1. vet_articles()       — filters raw RSS articles to only relevant ones
   2. generate_newsletter() — writes the full newsletter JSON
-
-The newsletter JSON schema:
-{
-    "region_display": str,
-    "edition": str,
-    "intro": str,
-    "market_pulse": str,
-    "transactions": [{"headline": str, "body": str, "takeaway": str}],
-    "developer_updates": [{"headline": str, "body": str, "takeaway": str}],
-    "people_movement": [{"headline": str, "body": str, "takeaway": str}],
-    "quick_bytes": [str],
-    "area_spotlights": {area_name: str},
-    "outro": str,
-}
 """
 
 import json
 import logging
 import os
-from datetime import datetime
+import re
 
-import anthropic
+import google.generativeai as genai
 
 from .config import REGIONS
 
 logger = logging.getLogger(__name__)
 
-_client: anthropic.Anthropic | None = None
+_model = None
 
 
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    return _client
+def _get_model():
+    global _model
+    if _model is None:
+        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        _model = genai.GenerativeModel("gemini-1.5-flash")
+    return _model
 
 
 # ---------------------------------------------------------------------------
@@ -47,17 +34,15 @@ def _get_client() -> anthropic.Anthropic:
 
 def vet_articles(articles: list[dict], region_key: str) -> list[dict]:
     """
-    Send raw articles to Claude and get back only those that are relevant
-    to office / commercial real estate in the given region.
-
-    Returns a filtered list with an added "category" key on each article.
+    Send raw articles to Gemini and get back only those relevant
+    to office/commercial real estate in the given region.
+    Returns filtered list with a "category" key added to each article.
     """
     if not articles:
         return []
 
     region_display = REGIONS[region_key]["display"]
 
-    # Build a compact representation for Claude to evaluate
     numbered = "\n".join(
         f"{i+1}. [{a['source']}] {a['title']} | {a['summary'][:200]}"
         for i, a in enumerate(articles)
@@ -65,62 +50,39 @@ def vet_articles(articles: list[dict], region_key: str) -> list[dict]:
 
     prompt = f"""You are a senior research analyst at myHQ, India's leading managed office platform.
 
-I need you to filter and categorise the following {len(articles)} news items to only keep articles
-that are **directly relevant** to office and commercial real estate in **{region_display}**.
+Filter the following {len(articles)} news items. Keep ONLY articles directly relevant to
+office and commercial real estate in {region_display}.
 
-RELEVANT includes:
-- Office leasing deals, transactions, pre-leases
-- Commercial real estate supply/demand data
-- New office park / IT park announcements or completions
-- Developer news (launch, delivery, acquisition of office assets)
-- Senior leadership moves in real estate or occupier companies
-- Market commentary: rentals, vacancy, absorption for office/commercial
+RELEVANT: office leasing deals, commercial real estate supply/demand, new office parks,
+developer news, senior leadership moves in real estate, market data on office rentals/vacancy.
 
-NOT RELEVANT (exclude):
-- Residential real estate
-- Retail / mall / hospitality news (unless it explicitly impacts office)
-- Pure macro economy news with no office angle
-- International news with no India/regional relevance
+NOT RELEVANT: residential, retail/mall, pure macro economy (unless office angle), international news.
 
-For each RELEVANT article, also assign exactly one category from:
+For each RELEVANT article assign one category:
   transactions | developer_updates | people_movement | market_trends | quick_bytes
 
-"quick_bytes" is for genuine news items but shorter/less impactful pieces.
+Return ONLY a JSON array, no explanation, no markdown:
+[{{"index": 1, "category": "transactions"}}, ...]
 
-Return ONLY a JSON array with this exact structure (no markdown, no explanation):
-[
-  {{"index": 1, "category": "transactions"}},
-  {{"index": 3, "category": "people_movement"}},
-  ...
-]
+Articles:
+{numbered}"""
 
-Articles to evaluate:
-{numbered}
-"""
+    model = _get_model()
+    logger.info("Vetting %d articles for %s …", len(articles), region_key)
 
-    client = _get_client()
-    logger.info("Vetting %d articles for region %s …", len(articles), region_key)
+    response = model.generate_content(prompt)
+    text = response.text.strip()
 
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=2048,
-        thinking={"type": "adaptive"},
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    text = next(
-        (b.text for b in response.content if b.type == "text"), "[]"
-    )
+    # Strip markdown code fences if present
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
 
     try:
-        selections = json.loads(text.strip())
+        selections = json.loads(text)
     except json.JSONDecodeError:
-        # Fallback: try to extract JSON array from text
-        import re
         match = re.search(r"\[.*\]", text, re.DOTALL)
         selections = json.loads(match.group(0)) if match else []
 
-    # Map back to original articles
     vetted = []
     for sel in selections:
         idx = sel.get("index", 0) - 1
@@ -144,22 +106,14 @@ def generate_newsletter(
     date_range: str,
 ) -> dict:
     """
-    Given vetted articles, ask Claude to write the full newsletter.
-    Returns a structured dict ready for template rendering.
-
-    Also generates area-specific spotlights for each major area in the region.
+    Ask Gemini to write the full newsletter from vetted articles.
+    Returns a structured dict ready for HTML template rendering.
     """
     region_display = REGIONS[region_key]["display"]
     areas = REGIONS[region_key]["areas"]
 
-    # Group articles by category for the prompt
-    grouped: dict[str, list[str]] = {
-        "transactions": [],
-        "developer_updates": [],
-        "people_movement": [],
-        "market_trends": [],
-        "quick_bytes": [],
-    }
+    # Group articles by category
+    grouped: dict[str, list[str]] = {}
     for a in vetted_articles:
         cat = a.get("category", "quick_bytes")
         grouped.setdefault(cat, []).append(
@@ -173,113 +127,91 @@ def generate_newsletter(
 
     areas_list = ", ".join(areas)
 
-    prompt = f"""You are the lead analyst writing the fortnightly **myHQ Market Insights** newsletter
-for real estate professionals and business decision-makers covering **{region_display}**.
+    prompt = f"""You are the lead analyst writing the fortnightly myHQ Market Insights newsletter
+for real estate professionals in {region_display}.
 
 Edition #{edition_number} | {date_range}
 
-Your audience is:
-- CRE brokers, property consultants, and developers
-- Corporate real estate heads and business POCs making leasing decisions
-- They are time-poor senior professionals who value sharp, data-backed insights
-- They want to know: what's happening, what it means for their portfolio / decisions
+Audience: CRE brokers, corporate real estate heads, business POCs making leasing decisions.
+They are time-poor senior professionals. Tone: sharp, confident, market-intelligent.
+Not dry. Engaging enough they read it end to end.
 
-Tone: confident, sharp, market-intelligent — like a smart colleague giving you the real picture.
-Not dry. Not salesy. Engaging enough that they read it end to end.
+Source articles:
+{articles_text if articles_text else "Limited news this fortnight."}
 
----
-Source articles (already filtered for relevance):
-{articles_text if articles_text else "Limited news this fortnight — write a brief but useful market summary."}
+Sub-areas for spotlight: {areas_list}
 
----
-Sub-areas for spotlight consideration: {areas_list}
+Write the newsletter as a single valid JSON object. No markdown, no code fences, just JSON.
 
----
-Write the newsletter as a **single valid JSON object** (no markdown, no code fences).
-
-Schema:
 {{
   "region_display": "{region_display}",
   "edition": "Edition #{edition_number} | {date_range}",
-  "intro": "<2-3 sentence punchy intro — what's the big story this fortnight?>",
-  "market_pulse": "<3-4 sentences on overall office market health in {region_display} — vacancy, absorption, rent trend, demand signals>",
+  "intro": "<2-3 sentence punchy intro — what is the big story this fortnight>",
+  "market_pulse": "<3-4 sentences on overall office market health — vacancy, absorption, rent trend>",
   "transactions": [
     {{
-      "headline": "<deal headline, factual and specific>",
-      "body": "<2-3 sentences with details: company, sq ft, location, deal terms if known>",
-      "takeaway": "<1 sentence: what this signals for the market>"
+      "headline": "<deal headline>",
+      "body": "<2-3 sentences: company, sq ft, location, terms>",
+      "takeaway": "<1 sentence market signal>"
     }}
   ],
   "developer_updates": [
     {{
-      "headline": "<project/developer headline>",
+      "headline": "<headline>",
       "body": "<2-3 sentences>",
-      "takeaway": "<1 sentence market signal>"
+      "takeaway": "<1 sentence>"
     }}
   ],
   "people_movement": [
     {{
       "headline": "<person + role change>",
-      "body": "<1-2 sentences on the move and its context>",
-      "takeaway": "<1 sentence on why this matters>"
+      "body": "<1-2 sentences>",
+      "takeaway": "<1 sentence why it matters>"
     }}
   ],
-  "quick_bytes": [
-    "<One crisp sentence per item — 4 to 6 short bullets of other relevant news>"
-  ],
+  "quick_bytes": ["<one crisp sentence per item, 4-6 bullets>"],
   "area_spotlights": {{
-    "<area_name>": "<2-3 sentences on what's happening specifically in this area this fortnight>"
+    "<area_name>": "<2-3 sentences on what is happening in this area>"
   }},
-  "outro": "<1-2 sentences signing off — forward-looking, what to watch in the next fortnight>"
+  "outro": "<1-2 sentences signing off, forward-looking>"
 }}
 
 Rules:
-- Only include sections where you have real content from the articles. Empty arrays [] are fine.
-- area_spotlights: pick the TOP 3-5 most newsworthy areas from {areas_list} based on the articles.
-- Every insight must be grounded in the source articles — do not fabricate deals or numbers.
-- If data is thin for a section, write less but keep it accurate.
-- Return ONLY the JSON object. No preamble, no explanation.
-"""
+- Only include sections with real content. Empty arrays [] are fine.
+- area_spotlights: pick top 3-4 most newsworthy areas from: {areas_list}
+- Ground every insight in the source articles — do not fabricate.
+- Return ONLY the JSON object."""
 
-    client = _get_client()
+    model = _get_model()
     logger.info("Generating newsletter for %s (edition #%d) …", region_key, edition_number)
 
-    # Stream for long output — get final message
-    with client.messages.stream(
-        model="claude-opus-4-6",
-        max_tokens=8192,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        response = stream.get_final_message()
-
-    raw = next(
-        (b.text for b in response.content if b.type == "text"), "{}"
+    response = model.generate_content(
+        prompt,
+        generation_config=genai.types.GenerationConfig(
+            temperature=0.7,
+            max_output_tokens=4096,
+        ),
     )
 
-    # Strip any accidental code fences
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```", 2)[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.rsplit("```", 1)[0].strip()
+    raw = response.text.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
 
     try:
         newsletter = json.loads(raw)
     except json.JSONDecodeError as exc:
-        logger.error("JSON parse failed: %s\nRaw output:\n%s", exc, raw[:500])
-        # Return a minimal fallback structure
+        logger.error("JSON parse failed: %s\nRaw:\n%s", exc, raw[:400])
         newsletter = {
             "region_display": region_display,
             "edition": f"Edition #{edition_number} | {date_range}",
-            "intro": f"Here is your fortnightly market update for {region_display}.",
-            "market_pulse": "Market data is being compiled. Check back for the full update.",
+            "intro": f"Your fortnightly market update for {region_display} is here.",
+            "market_pulse": "Market data is being compiled. Full update in next edition.",
             "transactions": [],
             "developer_updates": [],
             "people_movement": [],
-            "quick_bytes": ["Newsletter content is being processed. Please check again shortly."],
+            "quick_bytes": ["Newsletter content processing. Please check again shortly."],
             "area_spotlights": {},
-            "outro": "Stay tuned for more insights in the next edition.",
+            "outro": "More insights coming in the next fortnight. Stay tuned.",
         }
 
     logger.info("Newsletter generated for %s", region_key)
