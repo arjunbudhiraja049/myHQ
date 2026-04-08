@@ -21,20 +21,28 @@ GEMINI_URL = (
 
 
 def _call_gemini(prompt: str) -> str:
-    """Send a prompt to Gemini and return the response text."""
+    """Send a prompt to Gemini and return the response text. Retries on 429."""
+    import time
     api_key = os.environ["GEMINI_API_KEY"]
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096},
     }
-    response = requests.post(
-        GEMINI_URL,
-        params={"key": api_key},
-        json=payload,
-        timeout=60,
-    )
-    response.raise_for_status()
-    return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    for attempt in range(5):
+        response = requests.post(
+            GEMINI_URL,
+            params={"key": api_key},
+            json=payload,
+            timeout=90,
+        )
+        if response.status_code == 429:
+            wait = 30 * (attempt + 1)
+            logger.info("Rate limited by Gemini. Waiting %ds before retry %d/5 …", wait, attempt + 1)
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    raise RuntimeError("Gemini API rate limit not resolved after 5 retries.")
 
 
 def _clean_json(text: str) -> str:
