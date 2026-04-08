@@ -61,6 +61,7 @@ def _date_range() -> str:
 def run_newsletter_pipeline(
     regions: list[str] | None = None,
     dry_run: bool = False,
+    test_mode: bool = False,
 ) -> dict:
     """
     Full pipeline: fetch → vet → generate → send for each region.
@@ -87,8 +88,13 @@ def run_newsletter_pipeline(
         logger.info("=" * 60)
 
         # ---- 1. Fetch news ----
-        logger.info("[1/4] Fetching news …")
-        articles = fetch_region_news(region_key)
+        if test_mode:
+            from sample_news import SAMPLE_ARTICLES
+            articles = SAMPLE_ARTICLES.get(region_key, [])
+            logger.info("[1/4] TEST MODE — using %d sample articles", len(articles))
+        else:
+            logger.info("[1/4] Fetching news …")
+            articles = fetch_region_news(region_key)
         if not articles:
             logger.warning("No articles fetched for %s — skipping region", region_display)
             summary[region_key] = {"sent": 0, "failed": 0, "skipped": 0, "note": "no articles"}
@@ -165,10 +171,15 @@ def main():
         action="store_true",
         help="Render newsletters but do not send emails",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Use sample articles (no internet needed) — good for first-time testing",
+    )
     args = parser.parse_args()
 
     regions = [args.region] if args.region else None
-    run_newsletter_pipeline(regions=regions, dry_run=args.dry_run)
+    run_newsletter_pipeline(regions=regions, dry_run=args.dry_run, test_mode=args.test)
 
 
 if __name__ == "__main__":

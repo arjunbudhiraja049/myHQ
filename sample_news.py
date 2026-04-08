@@ -1,0 +1,176 @@
+"""
+Sample news articles used for testing when internet is unavailable.
+In production (your laptop / GitHub Actions), real RSS feeds are used instead.
+"""
+
+SAMPLE_ARTICLES = {
+    "bangalore": [
+        {
+            "title": "Flipkart leases 2.5 lakh sq ft office space in Outer Ring Road, Bengaluru",
+            "summary": "Flipkart has signed a long-term lease for 2.5 lakh sq ft of Grade-A office space at Prestige Tech Park on Outer Ring Road, Bengaluru. The deal is valued at approximately Rs 180 crore over a 9-year tenure.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Prestige Group to deliver 1.8 mn sq ft office supply in Whitefield by Q3 2026",
+            "summary": "Prestige Group has announced completion timeline for its Prestige Tech Cloud project in Whitefield — 1.8 million sq ft of Grade-A office space targeted for delivery by Q3 2026. The project is already 65% pre-leased.",
+            "source": "Business Standard",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Embassy REIT reports 94% occupancy in Bengaluru assets in Q4 FY26",
+            "summary": "Embassy Office Parks REIT reported a portfolio-level occupancy of 94% in its Bengaluru assets for Q4 FY26. Net absorption for the quarter stood at 1.2 mn sq ft, driven largely by GCC demand in HSR Layout and Electronic City.",
+            "source": "Business Standard",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Bengaluru office market records 14.2 mn sq ft gross absorption in FY26 — highest in 5 years",
+            "summary": "Bengaluru's office market recorded 14.2 million sq ft of gross absorption in FY2025-26, the highest in five years, according to a CBRE report. Outer Ring Road continued to dominate at 38% share, followed by Whitefield at 22%.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Sattva Group appoints Rajesh Nair as new CEO of its commercial real estate vertical",
+            "summary": "Sattva Group has appointed Rajesh Nair, formerly Senior Director at CBRE India, as the CEO of its commercial real estate division. Nair brings 18 years of CRE experience and will spearhead the group's 10 mn sq ft pipeline in Bengaluru and Hyderabad.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Office rentals in HSR Layout, Bengaluru rise 8% YoY amid tech sector demand",
+            "summary": "Micro-market analysis shows office rentals in HSR Layout have risen approximately 8% year-on-year to Rs 85-95 per sq ft per month. The uptick is attributed to strong demand from fintech and SaaS startups preferring the area for its talent catchment.",
+            "source": "Anarock Research",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Google expands GCC footprint with 3 lakh sq ft pre-lease in Hebbal, Bengaluru",
+            "summary": "Google India has signed a pre-lease agreement for 3 lakh sq ft in the upcoming RMZ Nexity project in Hebbal, Bengaluru. This is Google's third major office expansion in the city in 24 months, consolidating its GCC operations.",
+            "source": "Moneycontrol",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Koramangala micro-market sees 15% vacancy decline as demand from startups surges",
+            "summary": "Koramangala's office vacancy has declined from 18% to 12% over the past year, driven by growing demand from early and growth-stage startups in the D2C and consumer tech space. Average deal sizes have increased to 8,000–15,000 sq ft.",
+            "source": "Knight Frank",
+            "link": "",
+            "published": None,
+        },
+    ],
+    "delhi_ncr": [
+        {
+            "title": "Zomato signs 1.2 lakh sq ft lease at DLF CyberCity Gurugram for corporate HQ expansion",
+            "summary": "Zomato has leased 1.2 lakh sq ft of premium office space at DLF Cyber City, Gurugram, expanding its corporate headquarters as it scales its Blinkit and food delivery operations. The deal is structured as a 5-year lease at Rs 145 per sq ft.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "DLF to develop 5 mn sq ft of new office supply in Gurugram over next 3 years",
+            "summary": "DLF has announced plans to develop an additional 5 million sq ft of commercial office space in Gurugram's Golf Course Extension Road corridor. The phased development will be spread across three Grade-A campuses between 2026 and 2029.",
+            "source": "Business Standard",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Delhi NCR office market vacancy tightens to 20% as net absorption hits 3-year high",
+            "summary": "Delhi NCR's office vacancy rate tightened to 20.1% in Q1 FY27 from 23.4% a year ago, as net absorption reached 3.8 mn sq ft — a three-year high. Noida Expressway and Gurugram Cyber City led absorption, contributing over 60% of the total.",
+            "source": "Colliers India",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "JLL India names Priya Mehra as Head of Office Leasing for North India",
+            "summary": "JLL India has elevated Priya Mehra to Head of Office Leasing — North India. Mehra, a 12-year JLL veteran, previously led the Delhi NCR tenant rep practice and will now oversee all landlord and tenant mandates across the region.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Noida's Sector 62 emerges as preferred IT corridor; rents up 10% in 12 months",
+            "summary": "Noida Sector 62 has seen a 10% year-on-year rental increase to Rs 65–75 per sq ft per month as IT/ITeS companies and GCCs seek quality Grade-A space with RERA-compliant buildings and metro connectivity.",
+            "source": "Anarock",
+            "link": "",
+            "published": None,
+        },
+    ],
+    "chennai_hyderabad": [
+        {
+            "title": "Microsoft leases 4 lakh sq ft in Hyderabad's Financial District for GCC expansion",
+            "summary": "Microsoft India has signed a lease for 4 lakh sq ft of Grade-A office space at Raheja Mindspace in Hyderabad's Financial District. This is part of Microsoft's broader India GCC strategy, with Hyderabad becoming a key tech hub for cloud and AI teams.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Hyderabad office market absorbs 5.2 mn sq ft in FY26 — second highest ever",
+            "summary": "Hyderabad recorded 5.2 mn sq ft of gross office absorption in FY26, the second highest ever, driven by GCC demand (48% share), IT/ITeS (31%), and BFSI (12%). HITEC City and Gachibowli contributed 74% of total absorption.",
+            "source": "CBRE India",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Chennai's OMR IT Corridor sees revival; Sholinganallur vacancy drops to 11%",
+            "summary": "After two years of high vacancy, Chennai's OMR stretch from Perungudi to Sholinganallur is seeing renewed occupier interest. Vacancy in Sholinganallur has declined to 11% from 18% in 2023, driven by IT/ITeS and engineering services companies.",
+            "source": "Knight Frank",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Adani Realty launches 2.8 mn sq ft mixed-use commercial development near HITEC City",
+            "summary": "Adani Realty has announced Adani CyberSphere, a 2.8 mn sq ft mixed-use commercial development adjacent to Hyderabad's HITEC City. The project includes 2.1 mn sq ft of Grade-A office space and is targeted at GCCs and large technology companies.",
+            "source": "Business Standard",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "CBRE India promotes Arvind Kumar to MD — South India commercial leasing",
+            "summary": "CBRE India has promoted Arvind Kumar to Managing Director, South India Commercial Leasing. Kumar, who joined CBRE in 2012, has overseen over 8 mn sq ft of office transactions in Hyderabad and Chennai over his tenure.",
+            "source": "Moneycontrol",
+            "link": "",
+            "published": None,
+        },
+    ],
+    "mumbai_pune": [
+        {
+            "title": "HDFC Bank takes up 3.5 lakh sq ft at BKC for its expanded corporate office",
+            "summary": "HDFC Bank has leased 3.5 lakh sq ft of premium office space at One BKC, Bandra Kurla Complex, Mumbai. The bank is consolidating its retail banking and technology teams into this campus, replacing multiple smaller offices across the city.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Pune office market posts best Q1 in history with 3.1 mn sq ft absorption",
+            "summary": "Pune's office market recorded its highest-ever Q1 absorption at 3.1 mn sq ft in Q1 FY27, surpassing the previous record of 2.7 mn sq ft in Q1 FY24. Hinjewadi (Phase 1-3) and Kharadi led demand, together accounting for 58% of total leasing.",
+            "source": "Colliers India",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Godrej BKC Tower 2 fully leased ahead of delivery; 100% occupancy for 7 lakh sq ft",
+            "summary": "Godrej Properties has achieved 100% pre-leasing for BKC Tower 2 ahead of its Q3 FY27 delivery date. The 7 lakh sq ft Grade-A tower has been fully taken up by a mix of BFSI, consulting, and technology occupiers.",
+            "source": "Business Standard",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Goregaon-Malad corridor gains momentum; rents touch Rs 120 per sq ft",
+            "summary": "Goregaon and Malad's office micro-market is witnessing a significant uptick, with average rents reaching Rs 115–120 per sq ft per month — up 12% YoY. The area is attracting BFSI back-offices and media companies seeking quality Grade-B+ space at lower costs versus BKC.",
+            "source": "Anarock",
+            "link": "",
+            "published": None,
+        },
+        {
+            "title": "Cushman & Wakefield's India CEO Anshul Jain joins Blackstone Real Estate as MD",
+            "summary": "In a high-profile industry move, Anshul Jain, CEO of Cushman & Wakefield India, has joined Blackstone Real Estate as Managing Director — India. Jain will lead Blackstone's commercial office asset management and leasing strategy across its 100+ mn sq ft India portfolio.",
+            "source": "ET Realty",
+            "link": "",
+            "published": None,
+        },
+    ],
+}
